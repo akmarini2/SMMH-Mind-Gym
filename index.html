@@ -196,13 +196,13 @@
                         <input type="text" id="studentNameInput" maxlength="30" placeholder="e.g. Mohammad Ali bin Hassan" class="w-full px-4 py-3 rounded-xl bg-mint-50/50 border-2 border-mint-200 focus:border-mint-500 focus:bg-white focus:outline-none text-mint-900 font-semibold transition placeholder:text-mint-400">
                     </div>
                     <div>
-                        <label for="icNumberInput" class="block text-xs font-bold uppercase tracking-wider text-mint-900 mb-1.5">
-                            <i class="fas fa-id-card text-mint-600 mr-1"></i> Identity Card (IC) Number:
+                        <label for="classYearInput" class="block text-xs font-bold uppercase tracking-wider text-mint-900 mb-1.5">
+                            <i class="fas fa-graduation-cap text-mint-600 mr-1"></i> Class / Year:
                         </label>
-                        <input type="text" id="icNumberInput" maxlength="20" placeholder="e.g. 01-123456" class="w-full px-4 py-3 rounded-xl bg-mint-50/50 border-2 border-mint-200 focus:border-mint-500 focus:bg-white focus:outline-none text-mint-900 font-semibold font-mono transition placeholder:text-mint-400">
+                        <input type="text" id="classYearInput" maxlength="20" placeholder="e.g. Year 9 / Form 3" class="w-full px-4 py-3 rounded-xl bg-mint-50/50 border-2 border-mint-200 focus:border-mint-500 focus:bg-white focus:outline-none text-mint-900 font-semibold transition placeholder:text-mint-400">
                     </div>
                     <p class="text-xs text-mint-600 flex items-center gap-1 pt-1">
-                        <i class="fas fa-shield-halved"></i> 1 attempt per student. IC Number prevents replaying.
+                        <i class="fas fa-rotate text-mint-500"></i> Shared Device Mode: Sequential replays enabled.
                     </p>
                 </div>
 
@@ -453,8 +453,9 @@
                 </div>
 
                 <div class="flex flex-wrap gap-4 justify-center max-w-md mx-auto">
-                    <button onclick="location.reload()" class="py-3.5 px-8 bg-mint-600 hover:bg-mint-700 text-white font-extrabold rounded-2xl transition shadow-lg shadow-mint-600/30 flex-grow">
-                        Play Again
+                    <button onclick="location.reload()" class="py-3.5 px-8 bg-mint-600 hover:bg-mint-700 text-white font-extrabold rounded-2xl transition shadow-lg shadow-mint-600/30 flex-grow flex items-center justify-center gap-2">
+                        <i class="fas fa-user-plus"></i>
+                        <span>Next Player / Play Again</span>
                     </button>
                     <button onclick="openTeacherModal()" class="py-3.5 px-6 bg-mint-100 hover:bg-mint-200 text-mint-800 font-extrabold rounded-2xl border border-mint-300 transition">
                         Teacher Dashboard
@@ -511,7 +512,7 @@
                             <tr>
                                 <th class="p-3 text-xs font-extrabold text-mint-900 uppercase">Rank</th>
                                 <th class="p-3 text-xs font-extrabold text-mint-900 uppercase">Student Name</th>
-                                <th class="p-3 text-xs font-extrabold text-mint-900 uppercase">IC Number</th>
+                                <th class="p-3 text-xs font-extrabold text-mint-900 uppercase">Class / Year</th>
                                 <th class="p-3 text-xs font-extrabold text-mint-900 uppercase">Time</th>
                                 <th class="p-3 text-xs font-extrabold text-mint-900 uppercase">Hints</th>
                                 <th class="p-3 text-xs font-extrabold text-mint-900 uppercase">Date</th>
@@ -539,8 +540,7 @@
     <script>
         let gameState = {
             studentName: '',
-            icNumber: '',
-            icClean: '',
+            classYear: '',
             teamName: '',
             avatar: 'lion',
             currentPuzzle: 1,
@@ -659,53 +659,15 @@
 
         async function startEscapeRoom() {
             const nameInput = document.getElementById('studentNameInput').value.trim();
-            const icInput = document.getElementById('icNumberInput').value.trim();
+            const classInput = document.getElementById('classYearInput').value.trim();
 
             if (!nameInput) {
                 showModal('Name Required', 'Please enter your Full Name before starting!', 'fa-user-tag', true);
                 return;
             }
 
-            if (!icInput || icInput.length < 5) {
-                showModal('Valid IC Number Required', 'Please enter a valid IC Number before starting!', 'fa-id-card', true);
-                return;
-            }
-
-            const cleanIC = icInput.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-
-            // Check for duplicate attempt in local storage
-            const localData = getLocalBoard();
-            const localDuplicate = localData.find(e => e.icClean === cleanIC);
-            if (localDuplicate) {
-                showModal('Challenge Already Completed', `Student ${localDuplicate.studentName || ''} with IC Number (${icInput}) has already submitted an official attempt on ${localDuplicate.date || 'a previous session'}. Re-entries are locked.`, 'fa-user-lock', true);
-                return;
-            }
-
-            // Check for duplicate attempt in Firebase if online
-            if (window.isFirebaseReady && window.db && window.auth?.currentUser) {
-                try {
-                    const colRef = collection(window.db, 'artifacts', window.appId, 'public', 'data', 'leaderboard');
-                    const snapshot = await getDocs(colRef);
-                    let onlineDuplicate = null;
-                    snapshot.forEach(doc => {
-                        const data = doc.data();
-                        if (data.icClean === cleanIC) {
-                            onlineDuplicate = data;
-                        }
-                    });
-
-                    if (onlineDuplicate) {
-                        showModal('Challenge Already Completed', `Student (${onlineDuplicate.studentName || 'registered'}) with IC Number (${icInput}) has already submitted an official attempt. Re-entries are locked.`, 'fa-user-lock', true);
-                        return;
-                    }
-                } catch(e) {
-                    console.log("Firebase duplicate check fallback:", e);
-                }
-            }
-
             gameState.studentName = nameInput;
-            gameState.icNumber = icInput;
-            gameState.icClean = cleanIC;
+            gameState.classYear = classInput || 'N/A';
             gameState.teamName = nameInput;
 
             document.getElementById('hudTeamName').innerText = gameState.studentName;
@@ -1081,8 +1043,7 @@
             const entry = {
                 team: gameState.studentName,
                 studentName: gameState.studentName,
-                icNumber: gameState.icNumber,
-                icClean: gameState.icClean,
+                classYear: gameState.classYear,
                 seconds: gameState.elapsedSeconds,
                 timeStr: timeFormatted,
                 hints: gameState.hintsUsed,
@@ -1208,7 +1169,7 @@
                 tr.innerHTML = `
                     <td class="p-3 font-bold text-mint-900">${idx + 1}</td>
                     <td class="p-3 font-extrabold text-mint-950">${item.studentName || item.team}</td>
-                    <td class="p-3 font-mono font-bold text-mint-700">${item.icNumber || 'N/A'}</td>
+                    <td class="p-3 font-bold text-mint-700">${item.classYear || 'N/A'}</td>
                     <td class="p-3 font-mono font-bold text-mint-700">${item.timeStr}</td>
                     <td class="p-3 font-mono text-mint-800">${item.hints || 0}</td>
                     <td class="p-3 text-xs text-mint-600">${item.date || 'Today'}</td>
@@ -1224,9 +1185,9 @@
                 return;
             }
 
-            let csvContent = "data:text/csv;charset=utf-8,Rank,Student Name,IC Number,Time,Hints Used,Date\n";
+            let csvContent = "data:text/csv;charset=utf-8,Rank,Student Name,Class Year,Time,Hints Used,Date\n";
             data.forEach((row, idx) => {
-                csvContent += `${idx + 1},"${row.studentName || row.team}","${row.icNumber || 'N/A'}",${row.timeStr},${row.hints || 0},${row.date || ''}\n`;
+                csvContent += `${idx + 1},"${row.studentName || row.team}","${row.classYear || 'N/A'}",${row.timeStr},${row.hints || 0},${row.date || ''}\n`;
             });
 
             const encodedUri = encodeURI(csvContent);
