@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Mind Gym: Resilience Escape Challenge</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        mint: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            200: '#bbf7d0',
+                            300: '#86efac',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                        },
+                        sage: {
+                            100: '#eef2ee',
+                            200: '#d5ded5',
+                            500: '#688b68',
+                            800: '#2c3e2c',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f0fdf4 0%, #e6f4ea 50%, #dcfce7 100%);
+            color: #14532d;
+            min-height: 100vh;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(134, 239, 172, 0.4);
+            box-shadow: 0 10px 25px -5px rgba(22, 101, 52, 0.08), 0 8px 10px -6px rgba(22, 101, 52, 0.05);
+        }
+
+        .pulse-slow {
+            animation: pulseSlow 3s infinite ease-in-out;
+        }
+
+        @keyframes pulseSlow {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+
+        .shake-animation {
+            animation: shake 0.4s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+
+        /* Custom scrollbar for leaderboard & logs */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f0fdf4;
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #86efac;
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4ade80;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen relative selection:bg-mint-200 selection:text-mint-900 overflow-x-hidden">
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        window.db = null;
+        window.auth = null;
+        window.isFirebaseReady = false;
+        window.appId = typeof __app_id !== 'undefined' ? __app_id : 'mind-gym-escape-room';
+
+        async function initFirebase() {
+            if (typeof __firebase_config !== 'undefined') {
+                try {
+                    const firebaseConfig = JSON.parse(__firebase_config);
+                    const app = initializeApp(firebaseConfig);
+                    window.db = getFirestore(app);
+                    window.auth = getAuth(app);
+
+                    if (typeof __initial_auth_token !== 'undefined') {
+                        await signInWithCustomToken(window.auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(window.auth);
+                    }
+                    window.isFirebaseReady = true;
+                } catch (e) {
+                    console.log("Firebase fallback to offline local mode:", e);
+                }
+            }
+        }
+        initFirebase();
+    </script>
+
+    <header class="w-full bg-white/70 backdrop-blur-md border-b border-mint-200 sticky top-0 z-30 px-4 py-3">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="goHomeIfConfirm()">
+                <div class="w-10 h-10 rounded-xl bg-mint-500 flex items-center justify-center text-white shadow-md shadow-mint-500/30">
+                    <i class="fas fa-dumbbell text-lg"></i>
+                </div>
+                <div>
+                    <span class="text-xs font-extrabold text-mint-700 uppercase tracking-widest block leading-tight">SM MUDA HASHIM</span>
+                    <span class="font-black text-xl text-mint-900 tracking-tight block leading-none">THE MIND GYM</span>
+                    <span class="text-xs font-semibold text-mint-600 uppercase tracking-widest">Resilience Escape Challenge</span>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <button id="soundToggleBtn" onclick="toggleAudio()" class="p-2.5 rounded-xl bg-mint-100 hover:bg-mint-200 text-mint-800 transition flex items-center gap-2 text-sm font-semibold" title="Toggle Sound">
+                    <i class="fas fa-volume-up" id="soundIcon"></i>
+                    <span class="hidden sm:inline" id="soundText">Sound ON</span>
+                </button>
+                <button onclick="openTeacherModal()" class="px-3.5 py-2 rounded-xl bg-mint-800 hover:bg-mint-900 text-white font-semibold text-sm transition shadow-sm flex items-center gap-2">
+                    <i class="fas fa-user-shield text-xs"></i>
+                    <span>Teacher Access</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div id="customModal" class="fixed inset-0 bg-mint-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden transition-opacity duration-200">
+        <div class="glass-card max-w-md w-full rounded-3xl p-6 shadow-2xl border-2 border-mint-300 text-center transform transition-all scale-95" id="modalBox">
+            <div id="modalIconContainer" class="w-16 h-16 rounded-2xl bg-mint-100 text-mint-700 flex items-center justify-center mx-auto mb-4 text-2xl">
+                <i class="fas fa-info-circle" id="modalIcon"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-mint-950 mb-2" id="modalTitle">Notice</h3>
+            <p class="text-mint-800 text-sm leading-relaxed mb-6" id="modalBody">Description goes here.</p>
+            <div id="modalActions" class="flex gap-3 justify-center">
+                <button onclick="closeModal()" class="w-full py-3 bg-mint-600 hover:bg-mint-700 text-white font-bold rounded-xl transition shadow-lg shadow-mint-600/30">
+                    Got It
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN CONTAINER -->
+    <main class="flex-grow flex flex-col justify-center items-center p-4 md:p-6 max-w-5xl mx-auto w-full relative">
+
+        <section id="screen-home" class="w-full max-w-3xl my-auto py-6">
+            <div class="glass-card rounded-3xl p-6 sm:p-10 border border-mint-200 relative overflow-hidden text-center shadow-xl">
+                <!-- Background accent graphics -->
+                <div class="absolute -top-16 -left-16 w-48 h-48 bg-mint-300/30 rounded-full blur-2xl pointer-events-none"></div>
+                <div class="absolute -bottom-16 -right-16 w-56 h-56 bg-mint-400/20 rounded-full blur-3xl pointer-events-none"></div>
+
+                <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-mint-100 border border-mint-300 text-mint-800 text-xs font-bold uppercase tracking-wider mb-6">
+                    <i class="fas fa-shield-halved text-mint-600"></i> Interactive Mental Fitness Game
+                </div>
+
+                <h1 class="text-[5.5vw] sm:text-4xl md:text-5xl font-black text-mint-950 tracking-tight leading-tight mb-4 whitespace-nowrap">
+                    Unlock Your <span class="text-mint-600">Mental Toughness</span>
+                </h1>
+                <p class="text-mint-800 text-base sm:text-lg max-w-xl mx-auto mb-8 font-medium leading-relaxed">
+                    Stress, school pressures, match day anxiety, and keeping it bottled up? Break through the stigma. Work through 4 tactical puzzles to escape the Mind Gym.
+                </p>
+
+                <!-- Student Identification Box -->
+                <div class="bg-white/90 p-6 rounded-2xl border border-mint-200 shadow-sm max-w-md mx-auto mb-8 text-left space-y-4">
+                    <div>
+                        <label for="studentNameInput" class="block text-xs font-bold uppercase tracking-wider text-mint-900 mb-1.5">
+                            <i class="fas fa-user text-mint-600 mr-1"></i> Student Full Name:
+                        </label>
+                        <input type="text" id="studentNameInput" maxlength="30" placeholder="e.g. Mohammad Ali bin Hassan" class="w-full px-4 py-3 rounded-xl bg-mint-50/50 border-2 border-mint-200 focus:border-mint-500 focus:bg-white focus:outline-none text-mint-900 font-semibold transition placeholder:text-mint-400">
+                    </div>
+                    <div>
+                        <label for="icNumberInput" class="block text-xs font-bold uppercase tracking-wider text-mint-900 mb-1.5">
+                            <i class="fas fa-id-card text-mint-600 mr-1"></i> Identity Card (IC) Number:
+                        </label>
+                        <input type="text" id="icNumberInput" maxlength="20" placeholder="e.g. 01-123456" class="w-full px-4 py-3 rounded-xl bg-mint-50/50 border-2 border-mint-200 focus:border-mint-500 focus:bg-white focus:outline-none text-mint-900 font-semibold font-mono transition placeholder:text-mint-400">
+                    </div>
+                    <p class="text-xs text-mint-600 flex items-center gap-1 pt-1">
+                        <i class="fas fa-shield-halved"></i> 1 attempt per student. IC Number prevents replaying.
+                    </p>
+                </div>
+
+                <!-- Squad Avatar Selector -->
+                <div class="mb-8 max-w-md mx-auto">
+                    <span class="block text-xs font-bold uppercase tracking-wider text-mint-800 mb-3 text-center">Choose Squad Emblem:</span>
+                    <div class="flex justify-center gap-3" id="avatarSelector">
+                        <button onclick="selectAvatar('lion')" class="avatar-btn w-12 h-12 rounded-2xl bg-mint-100 border-2 border-mint-400 text-mint-800 text-xl flex items-center justify-center transition hover:scale-105 active:scale-95 active-avatar" data-avatar="lion">
+                            <i class="fas fa-dragon"></i>
+                        </button>
+                        <button onclick="selectAvatar('bolt')" class="avatar-btn w-12 h-12 rounded-2xl bg-white border-2 border-mint-200 text-mint-700 text-xl flex items-center justify-center transition hover:scale-105 active:scale-95" data-avatar="bolt">
+                            <i class="fas fa-bolt"></i>
+                        </button>
+                        <button onclick="selectAvatar('brain')" class="avatar-btn w-12 h-12 rounded-2xl bg-white border-2 border-mint-200 text-mint-700 text-xl flex items-center justify-center transition hover:scale-105 active:scale-95" data-avatar="brain">
+                            <i class="fas fa-brain"></i>
+                        </button>
+                        <button onclick="selectAvatar('gamepad')" class="avatar-btn w-12 h-12 rounded-2xl bg-white border-2 border-mint-200 text-mint-700 text-xl flex items-center justify-center transition hover:scale-105 active:scale-95" data-avatar="gamepad">
+                            <i class="fas fa-gamepad"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <button onclick="startEscapeRoom()" class="pulse-slow w-full max-w-md py-4 bg-mint-600 hover:bg-mint-700 active:bg-mint-800 text-white font-extrabold text-xl rounded-2xl shadow-lg shadow-mint-600/30 transition transform hover:-translate-y-0.5 flex items-center justify-center gap-3 mx-auto">
+                    <span>ENTER THE ESCAPE ROOM</span>
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+            </div>
+        </section>
+
+        <section id="screen-game" class="w-full flex-col hidden my-2">
+            
+            <!-- Game HUD Topbar -->
+            <div class="glass-card rounded-2xl p-4 mb-6 flex flex-wrap gap-4 justify-between items-center border border-mint-300 shadow-md">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-mint-600 text-white flex items-center justify-center font-bold text-lg" id="hudAvatar">
+                        <i class="fas fa-dragon"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs uppercase font-extrabold text-mint-600 tracking-wider block">Team / Player</span>
+                        <span class="font-extrabold text-mint-950 text-base" id="hudTeamName">Team Squad</span>
+                    </div>
+                </div>
+
+                <!-- Timer & Penalty Indicator -->
+                <div class="flex items-center gap-4">
+                    <div class="bg-mint-900 text-mint-100 px-4 py-2 rounded-xl flex items-center gap-2 border border-mint-700 font-mono font-bold text-xl shadow-inner">
+                        <i class="fas fa-stopwatch text-mint-400"></i>
+                        <span id="gameTimer">00:00</span>
+                    </div>
+                    <button onclick="getHint()" class="px-3 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300 text-xs font-bold transition flex items-center gap-1.5" title="Get a hint (+30s penalty)">
+                        <i class="fas fa-lightbulb text-amber-600"></i>
+                        <span>Hint (+30s)</span>
+                    </button>
+                </div>
+
+                <!-- Stage Tracker -->
+                <div class="w-full sm:w-auto flex items-center gap-1 bg-mint-100/70 p-1.5 rounded-xl border border-mint-200 justify-center">
+                    <div class="stage-dot w-8 h-8 rounded-lg bg-mint-600 text-white font-bold text-xs flex items-center justify-center" id="dot-1">1</div>
+                    <div class="w-3 h-0.5 bg-mint-300"></div>
+                    <div class="stage-dot w-8 h-8 rounded-lg bg-mint-200 text-mint-700 font-bold text-xs flex items-center justify-center" id="dot-2">2</div>
+                    <div class="w-3 h-0.5 bg-mint-300"></div>
+                    <div class="stage-dot w-8 h-8 rounded-lg bg-mint-200 text-mint-700 font-bold text-xs flex items-center justify-center" id="dot-3">3</div>
+                    <div class="w-3 h-0.5 bg-mint-300"></div>
+                    <div class="stage-dot w-8 h-8 rounded-lg bg-mint-200 text-mint-700 font-bold text-xs flex items-center justify-center" id="dot-4">4</div>
+                </div>
+            </div>
+
+            <!-- PUZZLE CONTAINER -->
+            <div id="puzzleArea" class="w-full">
+                
+                <div id="puzzle-1" class="puzzle-card glass-card rounded-3xl p-6 sm:p-8 border-2 border-mint-300 shadow-xl">
+                    <div class="flex items-center gap-3 mb-4">
+                        <span class="px-3 py-1 bg-mint-600 text-white rounded-lg text-xs font-black uppercase tracking-wider">Room 1 of 4</span>
+                        <h2 class="text-2xl font-black text-mint-950">The Heavy Backpack</h2>
+                    </div>
+                    <p class="text-mint-800 text-sm sm:text-base mb-6 leading-relaxed">
+                        You're weighed down before game day. School pressure, exams, and expectations are piling up. You need to lighten your mental backpack! 
+                        <br><strong class="text-mint-900">Task:</strong> Select <strong>ONLY the 4 healthy resilience boosters</strong> to unlock the gym door. Avoid counter-productive traps!
+                    </p>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6" id="p1OptionsContainer">
+                        <!-- Options generated dynamically -->
+                    </div>
+
+                    <button onclick="verifyPuzzle1()" class="w-full py-4 bg-mint-600 hover:bg-mint-700 text-white font-extrabold text-lg rounded-2xl transition shadow-lg shadow-mint-600/30 flex items-center justify-center gap-2">
+                        <span>UNLOCK DOOR 1</span>
+                        <i class="fas fa-lock-open"></i>
+                    </button>
+                </div>
+
+                <div id="puzzle-2" class="puzzle-card glass-card rounded-3xl p-6 sm:p-8 border-2 border-mint-300 shadow-xl hidden">
+                    <div class="flex items-center gap-3 mb-4">
+                        <span class="px-3 py-1 bg-mint-600 text-white rounded-lg text-xs font-black uppercase tracking-wider">Room 2 of 4</span>
+                        <h2 class="text-2xl font-black text-mint-950">De-Coding the Inner Critic</h2>
+                    </div>
+                    <p class="text-mint-800 text-sm sm:text-base mb-6 leading-relaxed">
+                        The room's console is locked by distorted thoughts that convince guys to stay silent or give up. Wire up the correct <strong>Reframed Mindset</strong> to bypass the system distortion!
+                    </p>
+
+                    <div class="bg-red-50/80 border-l-4 border-red-500 p-4 rounded-r-2xl mb-6">
+                        <span class="text-xs font-extrabold uppercase text-red-700 tracking-wider block mb-1">Distorted Thought Signal:</span>
+                        <p class="text-red-950 font-bold text-base sm:text-lg italic" id="p2DistortedText">
+                            "I messed up that presentation and penalty kick. I'm useless, everyone is laughing at me, and asking for help makes me look weak."
+                        </p>
+                    </div>
+
+                    <div class="space-y-3 mb-6" id="p2OptionsContainer">
+                        <!-- Options populated in JS -->
+                    </div>
+
+                    <button onclick="verifyPuzzle2()" class="w-full py-4 bg-mint-600 hover:bg-mint-700 text-white font-extrabold text-lg rounded-2xl transition shadow-lg shadow-mint-600/30 flex items-center justify-center gap-2">
+                        <span>RE-WIRE CONSOLE</span>
+                        <i class="fas fa-microchip"></i>
+                    </button>
+                </div>
+
+                <div id="puzzle-3" class="puzzle-card glass-card rounded-3xl p-6 sm:p-8 border-2 border-mint-300 shadow-xl hidden">
+                    <div class="flex items-center gap-3 mb-4">
+                        <span class="px-3 py-1 bg-mint-600 text-white rounded-lg text-xs font-black uppercase tracking-wider">Room 3 of 4</span>
+                        <h2 class="text-2xl font-black text-mint-950">The Pulse Stabilizer (Heart Rate Override)</h2>
+                    </div>
+                    <p class="text-mint-800 text-sm sm:text-base mb-6 leading-relaxed">
+                        High stress spike detected! Your heart rate is racing at <span class="font-extrabold text-red-600" id="bpmDisplay">150 BPM</span>. 
+                        <br><strong class="text-mint-900">Task:</strong> Tap the button when the moving sweeper enters the green <strong>CALM ZONE</strong> to lower your heart rate to a controlled <strong>60 BPM</strong>!
+                    </p>
+
+                    <!-- Heart Rate & Progress Visual -->
+                    <div class="bg-white/90 p-5 rounded-2xl border border-mint-200 shadow-sm text-center mb-6">
+                        <div class="flex justify-center items-center gap-3 mb-3">
+                            <i class="fas fa-heart-pulse text-red-500 text-3xl animate-pulse" id="heartPulseIcon"></i>
+                            <span class="text-4xl font-black font-mono text-mint-950" id="currentBpmText">150 <span class="text-sm font-sans font-bold text-mint-600">BPM</span></span>
+                        </div>
+                        
+                        <div class="w-full bg-mint-100 rounded-full h-3 mb-4 overflow-hidden border border-mint-300">
+                            <div id="bpmProgressBar" class="bg-red-500 h-full rounded-full transition-all duration-300" style="width: 100%;"></div>
+                        </div>
+
+                        <!-- Interactive Moving Indicator Gauge -->
+                        <div class="relative w-full h-16 bg-mint-950 rounded-2xl overflow-hidden border-2 border-mint-700 shadow-inner my-4 flex items-center" id="pulseTrack">
+                            <!-- Green Target Zone in Center -->
+                            <div class="absolute top-0 bottom-0 border-x-2 border-emerald-400 bg-emerald-500/30 flex items-center justify-center" style="left: 38%; width: 24%;">
+                                <span class="text-[10px] font-black tracking-widest text-emerald-200 uppercase pointer-events-none hidden sm:inline">CALM ZONE</span>
+                            </div>
+                            <!-- Moving Sweeper Bar -->
+                            <div id="pulseSweeper" class="absolute top-1 bottom-1 w-3 bg-yellow-400 rounded-full shadow-[0_0_12px_#facc15] transition-none" style="left: 0%;"></div>
+                        </div>
+
+                        <div class="text-xs font-bold text-mint-700">
+                            Successful Breath Locks: <span id="syncHitsCount" class="text-mint-900 font-extrabold text-sm">0</span> / 3
+                        </div>
+                    </div>
+
+                    <button id="p3SyncBtn" onclick="tapPulseSync()" class="w-full py-5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-black text-xl rounded-2xl transition shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-3">
+                        <i class="fas fa-hand-pointer"></i>
+                        <span>SYNC BREATH (TAP NOW)</span>
+                    </button>
+                </div>
+
+                <div id="puzzle-4" class="puzzle-card glass-card rounded-3xl p-6 sm:p-8 border-2 border-mint-300 shadow-xl hidden">
+                    <div class="flex items-center gap-3 mb-4">
+                        <span class="px-3 py-1 bg-mint-600 text-white rounded-lg text-xs font-black uppercase tracking-wider">Final Room</span>
+                        <h2 class="text-2xl font-black text-mint-950">The Vault of Connection</h2>
+                    </div>
+                    <p class="text-mint-800 text-sm sm:text-base mb-6 leading-relaxed">
+                        To crack the final exit code, answer these 3 rapid-fire scenario questions about supporting your mates and breaking mental health stigma.
+                    </p>
+
+                    <div class="space-y-6 mb-6" id="p4ScenariosContainer">
+                        <!-- Scenarios loaded via JS -->
+                    </div>
+
+                    <button onclick="verifyPuzzle4()" class="w-full py-4 bg-mint-600 hover:bg-mint-700 text-white font-extrabold text-lg rounded-2xl transition shadow-lg shadow-mint-600/30 flex items-center justify-center gap-2">
+                        <span>ESCAPE THE MIND GYM</span>
+                        <i class="fas fa-key"></i>
+                    </button>
+                </div>
+
+            </div>
+        </section>
+
+        <section id="screen-end" class="w-full max-w-4xl hidden my-auto py-6">
+            <div class="glass-card rounded-3xl p-6 sm:p-10 border border-mint-300 text-center shadow-2xl relative">
+                
+                <div class="w-20 h-20 rounded-3xl bg-mint-500 text-white flex items-center justify-center mx-auto mb-4 text-4xl shadow-xl shadow-mint-500/30">
+                    <i class="fas fa-trophy"></i>
+                </div>
+
+                <span class="inline-block px-4 py-1.5 rounded-full bg-mint-100 text-mint-800 font-extrabold text-xs tracking-wider uppercase mb-3">
+                    CHALLENGE COMPLETE
+                </span>
+
+                <h1 class="text-3xl sm:text-5xl font-black text-mint-950 mb-2">YOU ESCAPED!</h1>
+                <p class="text-mint-800 text-base sm:text-lg mb-8">
+                    Outstanding effort, <span class="font-extrabold text-mint-900" id="endTeamDisplay">Squad</span>! You've proved that strength is built through resilience and supporting your mates.
+                </p>
+
+                <!-- Stats Highlight -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto mb-8">
+                    <div class="bg-white/90 p-4 rounded-2xl border border-mint-200 shadow-sm">
+                        <span class="text-xs font-extrabold uppercase text-mint-600 tracking-wider block">Final Time</span>
+                        <span class="text-3xl font-black text-mint-950 font-mono" id="finalTimeDisplay">00:00</span>
+                    </div>
+                    <div class="bg-white/90 p-4 rounded-2xl border border-mint-200 shadow-sm">
+                        <span class="text-xs font-extrabold uppercase text-mint-600 tracking-wider block">Hints Used</span>
+                        <span class="text-3xl font-black text-mint-950 font-mono" id="finalHintsDisplay">0</span>
+                    </div>
+                    <div class="bg-white/90 p-4 rounded-2xl border border-mint-200 shadow-sm">
+                        <span class="text-xs font-extrabold uppercase text-mint-600 tracking-wider block">Resilience Rating</span>
+                        <span class="text-3xl font-black text-mint-600" id="finalGradeDisplay">S Class</span>
+                    </div>
+                </div>
+
+                <!-- Key Takeaway Banner -->
+                <div class="bg-mint-100/80 border-l-4 border-mint-600 p-5 rounded-r-2xl text-left max-w-2xl mx-auto mb-8">
+                    <h4 class="font-extrabold text-mint-950 flex items-center gap-2 mb-1 text-sm sm:text-base">
+                        <i class="fas fa-brain text-mint-600"></i> The Mind Gym Takeaway:
+                    </h4>
+                    <p class="text-mint-900 text-xs sm:text-sm leading-relaxed">
+                        Asking for help when you're overwhelmed is a sign of tactical intelligence and real strength, not weakness. Look out for your friends, check in when someone seems quiet, and use your grounding tools when pressure mounts.
+                    </p>
+                </div>
+
+                <!-- Leaderboard Section -->
+                <div class="max-w-2xl mx-auto text-left mb-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-extrabold text-mint-950 flex items-center gap-2">
+                            <i class="fas fa-list-ol text-mint-600"></i> Hall of Fame Leaderboard
+                        </h3>
+                        <span class="text-xs font-semibold text-mint-600 bg-mint-100 px-3 py-1 rounded-full">Top Performers</span>
+                    </div>
+
+                    <div class="bg-white rounded-2xl border border-mint-200 overflow-hidden shadow-inner max-h-60 overflow-y-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-mint-100/80 border-b border-mint-200 sticky top-0">
+                                <tr>
+                                    <th class="p-3 text-xs font-extrabold text-mint-900 uppercase">Rank</th>
+                                    <th class="p-3 text-xs font-extrabold text-mint-900 uppercase">Team / Player</th>
+                                    <th class="p-3 text-xs font-extrabold text-mint-900 uppercase text-right">Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="publicLeaderboardBody" class="divide-y divide-mint-100 text-sm font-medium">
+                                <tr>
+                                    <td colspan="3" class="p-4 text-center text-mint-600 italic">Loading scores...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap gap-4 justify-center max-w-md mx-auto">
+                    <button onclick="location.reload()" class="py-3.5 px-8 bg-mint-600 hover:bg-mint-700 text-white font-extrabold rounded-2xl transition shadow-lg shadow-mint-600/30 flex-grow">
+                        Play Again
+                    </button>
+                    <button onclick="openTeacherModal()" class="py-3.5 px-6 bg-mint-100 hover:bg-mint-200 text-mint-800 font-extrabold rounded-2xl border border-mint-300 transition">
+                        Teacher Dashboard
+                    </button>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <div id="teacherModal" class="fixed inset-0 bg-mint-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="glass-card max-w-2xl w-full rounded-3xl p-6 sm:p-8 shadow-2xl border-2 border-mint-300 relative max-h-[90vh] flex flex-col">
+            
+            <button onclick="closeTeacherModal()" class="absolute top-5 right-5 text-mint-600 hover:text-mint-900 text-xl w-9 h-9 rounded-full bg-mint-100 flex items-center justify-center transition">
+                <i class="fas fa-times"></i>
+            </button>
+
+            <!-- Login View -->
+            <div id="teacherLoginSection" class="text-center py-4">
+                <div class="w-16 h-16 rounded-2xl bg-mint-100 text-mint-800 flex items-center justify-center mx-auto mb-4 text-2xl">
+                    <i class="fas fa-user-shield"></i>
+                </div>
+                <h3 class="text-2xl font-black text-mint-950 mb-2">Teacher & Facilitator Access</h3>
+                <p class="text-mint-800 text-sm mb-6 max-w-md mx-auto">
+                    Enter the passcode to view class results, analytics, and manage the student leaderboard.
+                </p>
+
+                <div class="max-w-xs mx-auto mb-4">
+                    <input type="password" id="teacherPasscode" placeholder="Enter Passcode" class="w-full px-4 py-3 rounded-xl bg-white border-2 border-mint-300 focus:border-mint-600 focus:outline-none text-center font-mono font-bold text-lg text-mint-900">
+                </div>
+                <button onclick="verifyTeacherPass()" class="w-full max-w-xs py-3 bg-mint-800 hover:bg-mint-900 text-white font-extrabold rounded-xl transition shadow-md">
+                    Access Dashboard
+                </button>
+            </div>
+
+            <!-- Dashboard View -->
+            <div id="teacherDashboardSection" class="hidden flex-col h-full overflow-hidden">
+                <div class="flex justify-between items-center mb-4 pb-3 border-b border-mint-200">
+                    <div>
+                        <h3 class="text-xl font-black text-mint-950 flex items-center gap-2">
+                            <i class="fas fa-chalkboard-user text-mint-600"></i> Class Results Dashboard
+                        </h3>
+                        <span class="text-xs font-semibold text-mint-600">Live Student Escape Times</span>
+                    </div>
+                    <button onclick="refreshLeaderboardData()" class="px-3 py-1.5 rounded-lg bg-mint-100 hover:bg-mint-200 text-mint-800 font-bold text-xs transition flex items-center gap-1">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-xl border border-mint-200 overflow-hidden flex-grow overflow-y-auto mb-4">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-mint-100 border-b border-mint-200 sticky top-0">
+                            <tr>
+                                <th class="p-3 text-xs font-extrabold text-mint-900 uppercase">Rank</th>
+                                <th class="p-3 text-xs font-extrabold text-mint-900 uppercase">Student Name</th>
+                                <th class="p-3 text-xs font-extrabold text-mint-900 uppercase">IC Number</th>
+                                <th class="p-3 text-xs font-extrabold text-mint-900 uppercase">Time</th>
+                                <th class="p-3 text-xs font-extrabold text-mint-900 uppercase">Hints</th>
+                                <th class="p-3 text-xs font-extrabold text-mint-900 uppercase">Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="teacherLeaderboardTable" class="divide-y divide-mint-100 text-sm">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="flex flex-wrap gap-2 justify-between items-center pt-2">
+                    <button onclick="exportCSV()" class="px-4 py-2 bg-mint-600 hover:bg-mint-700 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5">
+                        <i class="fas fa-file-csv"></i> Export Results (CSV)
+                    </button>
+                    <button id="clearDataBtn" onclick="requestClearLocalBoard()" class="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-800 font-bold rounded-xl text-xs transition">
+                        Clear Local Data
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        let gameState = {
+            studentName: '',
+            icNumber: '',
+            icClean: '',
+            teamName: '',
+            avatar: 'lion',
+            currentPuzzle: 1,
+            startTime: 0,
+            timerInterval: null,
+            elapsedSeconds: 0,
+            penaltySeconds: 0,
+            hintsUsed: 0,
+            soundEnabled: true,
+            puzzle3Sequence: []
+        };
+
+        // Web Audio Synthesizer for embedded sound FX (No external mp3 assets required)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if (!gameState.soundEnabled || !audioCtx) return;
+            try {
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                const now = audioCtx.currentTime;
+
+                if (type === 'click') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.exponentialRampToValueAtTime(200, now + 0.05);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                    osc.start(now);
+                    osc.stop(now + 0.05);
+                } else if (type === 'success') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.setValueAtTime(500, now + 0.1);
+                    osc.frequency.setValueAtTime(700, now + 0.2);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                    osc.start(now);
+                    osc.stop(now + 0.35);
+                } else if (type === 'error') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(180, now);
+                    osc.frequency.setValueAtTime(120, now + 0.1);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                } else if (type === 'victory') {
+                    [261.63, 329.63, 392.00, 523.25].forEach((freq, index) => {
+                        const o = audioCtx.createOscillator();
+                        const g = audioCtx.createGain();
+                        o.connect(g);
+                        g.connect(audioCtx.destination);
+                        o.type = 'sine';
+                        o.frequency.setValueAtTime(freq, now + (index * 0.12));
+                        g.gain.setValueAtTime(0.2, now + (index * 0.12));
+                        g.gain.exponentialRampToValueAtTime(0.01, now + (index * 0.12) + 0.4);
+                        o.start(now + (index * 0.12));
+                        o.stop(now + (index * 0.12) + 0.4);
+                    });
+                }
+            } catch(e) {}
+        }
+
+        function toggleAudio() {
+            gameState.soundEnabled = !gameState.soundEnabled;
+            const btn = document.getElementById('soundIcon');
+            const txt = document.getElementById('soundText');
+            if (gameState.soundEnabled) {
+                btn.className = 'fas fa-volume-up';
+                txt.innerText = 'Sound ON';
+                playSound('click');
+            } else {
+                btn.className = 'fas fa-volume-mute';
+                txt.innerText = 'Sound OFF';
+            }
+        }
+
+        function showModal(title, body, icon = 'fa-info-circle', isError = false) {
+            document.getElementById('modalTitle').innerText = title;
+            document.getElementById('modalBody').innerText = body;
+            document.getElementById('modalIcon').className = `fas ${icon}`;
+            
+            const container = document.getElementById('modalIconContainer');
+            if (isError) {
+                container.className = 'w-16 h-16 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4 text-2xl';
+                playSound('error');
+            } else {
+                container.className = 'w-16 h-16 rounded-2xl bg-mint-100 text-mint-700 flex items-center justify-center mx-auto mb-4 text-2xl';
+            }
+
+            document.getElementById('customModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('customModal').classList.add('hidden');
+        }
+
+        function selectAvatar(name) {
+            gameState.avatar = name;
+            playSound('click');
+            document.querySelectorAll('.avatar-btn').forEach(btn => {
+                btn.classList.remove('active-avatar', 'bg-mint-100', 'border-mint-400');
+                btn.classList.add('bg-white', 'border-mint-200');
+                if (btn.getAttribute('data-avatar') === name) {
+                    btn.classList.add('active-avatar', 'bg-mint-100', 'border-mint-400');
+                }
+            });
+        }
+
+        async function startEscapeRoom() {
+            const nameInput = document.getElementById('studentNameInput').value.trim();
+            const icInput = document.getElementById('icNumberInput').value.trim();
+
+            if (!nameInput) {
+                showModal('Name Required', 'Please enter your Full Name before starting!', 'fa-user-tag', true);
+                return;
+            }
+
+            if (!icInput || icInput.length < 5) {
+                showModal('Valid IC Number Required', 'Please enter a valid IC Number before starting!', 'fa-id-card', true);
+                return;
+            }
+
+            const cleanIC = icInput.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+
+            // Check for duplicate attempt in local storage
+            const localData = getLocalBoard();
+            const localDuplicate = localData.find(e => e.icClean === cleanIC);
+            if (localDuplicate) {
+                showModal('Challenge Already Completed', `Student ${localDuplicate.studentName || ''} with IC Number (${icInput}) has already submitted an official attempt on ${localDuplicate.date || 'a previous session'}. Re-entries are locked.`, 'fa-user-lock', true);
+                return;
+            }
+
+            // Check for duplicate attempt in Firebase if online
+            if (window.isFirebaseReady && window.db && window.auth?.currentUser) {
+                try {
+                    const colRef = collection(window.db, 'artifacts', window.appId, 'public', 'data', 'leaderboard');
+                    const snapshot = await getDocs(colRef);
+                    let onlineDuplicate = null;
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        if (data.icClean === cleanIC) {
+                            onlineDuplicate = data;
+                        }
+                    });
+
+                    if (onlineDuplicate) {
+                        showModal('Challenge Already Completed', `Student (${onlineDuplicate.studentName || 'registered'}) with IC Number (${icInput}) has already submitted an official attempt. Re-entries are locked.`, 'fa-user-lock', true);
+                        return;
+                    }
+                } catch(e) {
+                    console.log("Firebase duplicate check fallback:", e);
+                }
+            }
+
+            gameState.studentName = nameInput;
+            gameState.icNumber = icInput;
+            gameState.icClean = cleanIC;
+            gameState.teamName = nameInput;
+
+            document.getElementById('hudTeamName').innerText = gameState.studentName;
+            
+            // Set HUD Avatar Icon
+            const avatarIcons = {
+                lion: 'fa-dragon',
+                bolt: 'fa-bolt',
+                brain: 'fa-brain',
+                gamepad: 'fa-gamepad'
+            };
+            document.getElementById('hudAvatar').innerHTML = `<i class="fas ${avatarIcons[gameState.avatar] || 'fa-users'}"></i>`;
+
+            // Switch Screen
+            document.getElementById('screen-home').classList.add('hidden');
+            document.getElementById('screen-game').classList.remove('hidden');
+            document.getElementById('screen-game').classList.add('flex');
+
+            // Setup Puzzles
+            initPuzzle1Options();
+            initPuzzle2Options();
+            initPuzzle4Scenarios();
+
+            // Start Timer
+            gameState.startTime = Date.now();
+            gameState.timerInterval = setInterval(updateTimer, 1000);
+            playSound('success');
+        }
+
+        function updateTimer() {
+            const now = Date.now();
+            gameState.elapsedSeconds = Math.floor((now - gameState.startTime) / 1000) + gameState.penaltySeconds;
+            
+            const mins = Math.floor(gameState.elapsedSeconds / 60).toString().padStart(2, '0');
+            const secs = (gameState.elapsedSeconds % 60).toString().padStart(2, '0');
+            document.getElementById('gameTimer').innerText = `${mins}:${secs}`;
+        }
+
+        function getHint() {
+            gameState.penaltySeconds += 30;
+            gameState.hintsUsed++;
+            playSound('click');
+
+            const hints = {
+                1: "Hint for Room 1: Healthy boosters include physical exercise, rest, breathwork, and talking with a mate. Avoid bottling up or late-night gaming binges!",
+                2: "Hint for Room 2: Look for the response that is realistic, compassionate, and acknowledges that mistakes are normal steps in learning.",
+                3: "Hint for Room 3: Wait for the glowing yellow line to cross inside the green CALM ZONE in the center before tapping!",
+                4: "Hint for Room 4: Real strength is showing empathy, encouraging mates to speak to trusted adults, and avoiding toxic silence."
+            };
+
+            showModal("Tactical Hint (+30s Added)", hints[gameState.currentPuzzle] || "Keep focus and evaluate options carefully!", 'fa-lightbulb');
+        }
+
+        function goHomeIfConfirm() {
+            if (gameState.elapsedSeconds > 0 && gameState.currentPuzzle <= 4) {
+                showModal("Challenge Active", "Your challenge is currently in progress. Complete all 4 rooms to log your time!", "fa-clock");
+            }
+        }
+
+        const p1Data = [
+            { id: 1, text: "Hitting the gym / playing sports", healthy: true, icon: "fa-volleyball" },
+            { id: 2, text: "Bottling up stress & acting fine", healthy: false, icon: "fa-mask" },
+            { id: 3, text: "Talking openly with a trusted mate", healthy: true, icon: "fa-comments" },
+            { id: 4, text: "Gaming till 4 AM to avoid homework", healthy: false, icon: "fa-moon" },
+            { id: 5, text: "Box breathing & tactical relaxation", healthy: true, icon: "fa-wind" },
+            { id: 6, text: "Rage quitting & isolating yourself", healthy: false, icon: "fa-circle-xmark" },
+            { id: 7, text: "Getting 8 hours quality sleep", healthy: true, icon: "fa-bed" },
+            { id: 8, text: "Skipping meals when stressed", healthy: false, icon: "fa-utensils" }
+        ];
+
+        let p1Selected = new Set();
+
+        function initPuzzle1Options() {
+            const container = document.getElementById('p1OptionsContainer');
+            container.innerHTML = '';
+            
+            p1Data.forEach(item => {
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-2xl border-2 border-mint-200 bg-white hover:bg-mint-50 cursor-pointer transition flex items-center gap-3 select-none p1-item`;
+                card.dataset.id = item.id;
+                card.onclick = () => toggleP1Item(card, item.id);
+                
+                card.innerHTML = `
+                    <div class="w-10 h-10 rounded-xl bg-mint-100 text-mint-700 flex items-center justify-center font-bold text-lg flex-shrink-0 icon-box">
+                        <i class="fas ${item.icon}"></i>
+                    </div>
+                    <span class="font-bold text-mint-900 text-sm">${item.text}</span>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function toggleP1Item(card, id) {
+            playSound('click');
+            if (p1Selected.has(id)) {
+                p1Selected.delete(id);
+                card.classList.remove('border-mint-600', 'bg-mint-100/80', 'shadow-md');
+                card.classList.add('border-mint-200', 'bg-white');
+            } else {
+                p1Selected.add(id);
+                card.classList.remove('border-mint-200', 'bg-white');
+                card.classList.add('border-mint-600', 'bg-mint-100/80', 'shadow-md');
+            }
+        }
+
+        function verifyPuzzle1() {
+            const correctIds = p1Data.filter(d => d.healthy).map(d => d.id);
+            const userChoice = Array.from(p1Selected);
+
+            const isCorrect = userChoice.length === correctIds.length && userChoice.every(id => correctIds.includes(id));
+
+            if (isCorrect) {
+                playSound('success');
+                advancePuzzle(2);
+            } else {
+                gameState.penaltySeconds += 15;
+                showModal("Lock Jammed (+15s Penalty)", "Your pack still contains counter-productive stressors or missed key boosters! Ensure you select ONLY the 4 healthy coping mechanisms.", 'fa-triangle-exclamation', true);
+            }
+        }
+
+        const p2Options = [
+            { id: 'wrong1', text: "I'll just pretend it never happened and never try out for the team again." },
+            { id: 'correct', text: "One bad game or mistake doesn't define my ability. I can learn from what went wrong, practice, and talk to my coach or mates." },
+            { id: 'wrong2', text: "It's all my teammate's fault for giving me a bad pass. Everyone else messed up." }
+        ];
+
+        function initPuzzle2Options() {
+            const container = document.getElementById('p2OptionsContainer');
+            container.innerHTML = '';
+
+            p2Options.forEach(opt => {
+                const label = document.createElement('label');
+                label.className = `flex items-start p-4 rounded-2xl border-2 border-mint-200 bg-white hover:bg-mint-50 cursor-pointer transition text-mint-900 font-semibold text-sm sm:text-base gap-3`;
+                label.innerHTML = `
+                    <input type="radio" name="p2Answer" value="${opt.id}" class="mt-1 w-5 h-5 text-mint-600 border-mint-300 focus:ring-mint-500">
+                    <span>${opt.text}</span>
+                `;
+                container.appendChild(label);
+            });
+        }
+
+        function verifyPuzzle2() {
+            const selected = document.querySelector('input[name="p2Answer"]:checked');
+            if (!selected) {
+                showModal("Selection Required", "Please select a reframed mindset option to calibrate the console!", 'fa-hand-pointer', true);
+                return;
+            }
+
+            if (selected.value === 'correct') {
+                playSound('success');
+                advancePuzzle(3);
+            } else {
+                gameState.penaltySeconds += 15;
+                showModal("Signal Distorted (+15s)", "That mindset either avoids responsibility or gives up! Choose the realistic, growth-focused reframe.", 'fa-shield-cat', true);
+            }
+        }
+
+        let p3State = {
+            bpm: 150,
+            hits: 0,
+            animId: null,
+            position: 0,
+            direction: 1,
+            speed: 1.2,
+            active: false
+        };
+
+        function startPuzzle3Game() {
+            p3State.bpm = 150;
+            p3State.hits = 0;
+            p3State.position = 0;
+            p3State.direction = 1;
+            p3State.speed = 1.2;
+            p3State.active = true;
+            updateP3UI();
+            if (p3State.animId) cancelAnimationFrame(p3State.animId);
+            animatePulseSweeper();
+        }
+
+        function animatePulseSweeper() {
+            if (!p3State.active) return;
+
+            p3State.position += p3State.speed * p3State.direction;
+            if (p3State.position >= 96) {
+                p3State.position = 96;
+                p3State.direction = -1;
+            } else if (p3State.position <= 0) {
+                p3State.position = 0;
+                p3State.direction = 1;
+            }
+
+            const sweeper = document.getElementById('pulseSweeper');
+            if (sweeper) {
+                sweeper.style.left = p3State.position + '%';
+            }
+
+            p3State.animId = requestAnimationFrame(animatePulseSweeper);
+        }
+
+        function tapPulseSync() {
+            if (!p3State.active) return;
+
+            // Target zone is between 38% and 62%
+            const inZone = p3State.position >= 38 && p3State.position <= 62;
+
+            if (inZone) {
+                playSound('success');
+                p3State.hits++;
+                p3State.bpm = Math.max(60, p3State.bpm - 30);
+                p3State.speed += 0.35; // speed up slightly for next attempt
+                
+                const track = document.getElementById('pulseTrack');
+                track.classList.add('ring-4', 'ring-emerald-400');
+                setTimeout(() => track.classList.remove('ring-4', 'ring-emerald-400'), 300);
+
+            } else {
+                playSound('error');
+                gameState.penaltySeconds += 10;
+                p3State.bpm = Math.min(150, p3State.bpm + 10);
+                
+                const card = document.getElementById('puzzle-3');
+                card.classList.add('shake-animation');
+                setTimeout(() => card.classList.remove('shake-animation'), 400);
+            }
+
+            updateP3UI();
+
+            if (p3State.bpm <= 60 && p3State.hits >= 3) {
+                p3State.active = false;
+                if (p3State.animId) cancelAnimationFrame(p3State.animId);
+                setTimeout(() => {
+                    advancePuzzle(4);
+                }, 400);
+            }
+        }
+
+        function updateP3UI() {
+            const bpmText = document.getElementById('currentBpmText');
+            const bpmDisplay = document.getElementById('bpmDisplay');
+            const hitsCount = document.getElementById('syncHitsCount');
+            const progressBar = document.getElementById('bpmProgressBar');
+
+            if (bpmText) bpmText.innerHTML = `${p3State.bpm} <span class="text-sm font-sans font-bold text-mint-600">BPM</span>`;
+            if (bpmDisplay) bpmDisplay.innerText = `${p3State.bpm} BPM`;
+            if (hitsCount) hitsCount.innerText = p3State.hits;
+
+            if (progressBar) {
+                const percentage = Math.max(0, ((p3State.bpm - 60) / 90) * 100);
+                progressBar.style.width = `${percentage}%`;
+                if (p3State.bpm <= 90) {
+                    progressBar.className = 'bg-emerald-500 h-full rounded-full transition-all duration-300';
+                } else if (p3State.bpm <= 120) {
+                    progressBar.className = 'bg-amber-500 h-full rounded-full transition-all duration-300';
+                } else {
+                    progressBar.className = 'bg-red-500 h-full rounded-full transition-all duration-300';
+                }
+            }
+        }
+
+        const p4Scenarios = [
+            {
+                id: 1,
+                question: "1. Your mate has been unusually quiet, skipping football practice, and isolating himself for two weeks. What's the best action?",
+                options: [
+                    { id: 'a', text: "Ignore it; guys don't talk about feelings." },
+                    { id: 'b', text: "Check in privately: 'Hey man, noticed you've been quiet lately. I'm here if you want to chat or hit the gym.'", correct: true },
+                    { id: 'c', text: "Make fun of him in front of the squad to force him to speak." }
+                ]
+            },
+            {
+                id: 2,
+                question: "2. Exam pressure is overwhelming you and you can't sleep. What is real mental toughness?",
+                options: [
+                    { id: 'a', text: "Speaking to a school counsellor, parent, or teacher to get a study strategy plan.", correct: true },
+                    { id: 'b', text: "Pulling 3 consecutive all-nighters with energy drinks." },
+                    { id: 'c', text: "Suffering in silence so no one thinks you're stressed." }
+                ]
+            }
+        ];
+
+        function initPuzzle4Scenarios() {
+            const container = document.getElementById('p4ScenariosContainer');
+            container.innerHTML = '';
+
+            p4Scenarios.forEach((scen, idx) => {
+                const box = document.createElement('div');
+                box.className = 'bg-white/90 p-5 rounded-2xl border border-mint-200 shadow-sm text-left';
+                
+                let optsHTML = '';
+                scen.options.forEach(o => {
+                    optsHTML += `
+                        <label class="flex items-start p-3 rounded-xl border border-mint-200 hover:bg-mint-50 cursor-pointer transition text-mint-900 text-xs sm:text-sm font-semibold gap-2">
+                            <input type="radio" name="p4_scen_${scen.id}" value="${o.correct ? 'correct' : 'wrong'}" class="mt-0.5 text-mint-600 focus:ring-mint-500">
+                            <span>${o.text}</span>
+                        </label>
+                    `;
+                });
+
+                box.innerHTML = `
+                    <h4 class="font-extrabold text-mint-950 text-sm sm:text-base mb-3">${scen.question}</h4>
+                    <div class="space-y-2">${optsHTML}</div>
+                `;
+                container.appendChild(box);
+            });
+        }
+
+        function verifyPuzzle4() {
+            let allCorrect = true;
+
+            p4Scenarios.forEach(scen => {
+                const selected = document.querySelector(`input[name="p4_scen_${scen.id}"]:checked`);
+                if (!selected || selected.value !== 'correct') {
+                    allCorrect = false;
+                }
+            });
+
+            if (allCorrect) {
+                playSound('victory');
+                completeEscapeRoom();
+            } else {
+                gameState.penaltySeconds += 20;
+                showModal("Vault Cipher Error (+20s)", "One or more scenario answers are incorrect. Choose responses that build connection, support mates, and reject silent suffering!", 'fa-shield-xmark', true);
+            }
+        }
+
+        function advancePuzzle(nextStage) {
+            document.getElementById(`puzzle-${gameState.currentPuzzle}`).classList.add('hidden');
+            
+            // Update dots
+            document.getElementById(`dot-${gameState.currentPuzzle}`).className = 'stage-dot w-8 h-8 rounded-lg bg-mint-200 text-mint-700 font-bold text-xs flex items-center justify-center';
+            document.getElementById(`dot-${nextStage}`).className = 'stage-dot w-8 h-8 rounded-lg bg-mint-600 text-white font-bold text-xs flex items-center justify-center';
+
+            gameState.currentPuzzle = nextStage;
+            document.getElementById(`puzzle-${nextStage}`).classList.remove('hidden');
+
+            if (nextStage === 3) {
+                startPuzzle3Game();
+            }
+        }
+
+        async function completeEscapeRoom() {
+            clearInterval(gameState.timerInterval);
+
+            // Hide Game, Show End Screen
+            document.getElementById('screen-game').classList.add('hidden');
+            document.getElementById('screen-end').classList.remove('hidden');
+
+            // Format stats
+            const mins = Math.floor(gameState.elapsedSeconds / 60).toString().padStart(2, '0');
+            const secs = (gameState.elapsedSeconds % 60).toString().padStart(2, '0');
+            const timeFormatted = `${mins}:${secs}`;
+
+            document.getElementById('endTeamDisplay').innerText = gameState.teamName;
+            document.getElementById('finalTimeDisplay').innerText = timeFormatted;
+            document.getElementById('finalHintsDisplay').innerText = gameState.hintsUsed;
+
+            // Grade evaluation
+            let grade = 'S Class';
+            if (gameState.elapsedSeconds > 300) grade = 'A Class';
+            if (gameState.elapsedSeconds > 450) grade = 'B Class';
+            document.getElementById('finalGradeDisplay').innerText = grade;
+
+            // Confetti Blast
+            try {
+                confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+            } catch(e) {}
+
+            // Record Leaderboard Data
+            const entry = {
+                team: gameState.studentName,
+                studentName: gameState.studentName,
+                icNumber: gameState.icNumber,
+                icClean: gameState.icClean,
+                seconds: gameState.elapsedSeconds,
+                timeStr: timeFormatted,
+                hints: gameState.hintsUsed,
+                date: new Date().toLocaleDateString()
+            };
+
+            saveLeaderboardEntry(entry);
+        }
+
+        function getLocalBoard() {
+            return JSON.parse(localStorage.getItem('mindGymLeaderboard') || '[]');
+        }
+
+        async function saveLeaderboardEntry(entry) {
+            // Local Storage fallback
+            const localData = getLocalBoard();
+            localData.push(entry);
+            localData.sort((a,b) => a.seconds - b.seconds);
+            localStorage.setItem('mindGymLeaderboard', JSON.stringify(localData));
+
+            // Save to Firebase if configured
+            if (window.isFirebaseReady && window.db && window.auth?.currentUser) {
+                try {
+                    const colRef = collection(window.db, 'artifacts', window.appId, 'public', 'data', 'leaderboard');
+                    await addDoc(colRef, {
+                        ...entry,
+                        userId: window.auth.currentUser.uid,
+                        timestamp: Date.now()
+                    });
+                } catch(e) {
+                    console.log("Firebase write error:", e);
+                }
+            }
+
+            renderPublicLeaderboard();
+        }
+
+        async function renderPublicLeaderboard() {
+            const tbody = document.getElementById('publicLeaderboardBody');
+            tbody.innerHTML = '';
+
+            let data = [];
+
+            if (window.isFirebaseReady && window.db && window.auth?.currentUser) {
+                try {
+                    const colRef = collection(window.db, 'artifacts', window.appId, 'public', 'data', 'leaderboard');
+                    const snapshot = await getDocs(colRef);
+                    snapshot.forEach(doc => data.push(doc.data()));
+                    data.sort((a,b) => a.seconds - b.seconds);
+                } catch(e) {
+                    data = getLocalBoard();
+                }
+            } else {
+                data = getLocalBoard();
+            }
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-mint-600 italic">No escape times logged yet. Be the first!</td></tr>';
+                return;
+            }
+
+            data.slice(0, 10).forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.className = index % 2 === 0 ? 'bg-white' : 'bg-mint-50/50';
+                tr.innerHTML = `
+                    <td class="p-3 font-extrabold text-mint-900">${index + 1}</td>
+                    <td class="p-3 font-bold text-mint-950">${item.team}</td>
+                    <td class="p-3 font-mono font-extrabold text-mint-600 text-right">${item.timeStr}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function openTeacherModal() {
+            playSound('click');
+            document.getElementById('teacherModal').classList.remove('hidden');
+        }
+
+        function closeTeacherModal() {
+            document.getElementById('teacherModal').classList.add('hidden');
+        }
+
+        function verifyTeacherPass() {
+            const pass = document.getElementById('teacherPasscode').value.trim();
+            if (pass === 'TeacherSri') {
+                playSound('success');
+                document.getElementById('teacherLoginSection').classList.add('hidden');
+                document.getElementById('teacherDashboardSection').classList.remove('hidden');
+                document.getElementById('teacherDashboardSection').classList.add('flex');
+                refreshLeaderboardData();
+            } else {
+                showModal("Access Denied", "Incorrect teacher passcode!", 'fa-lock', true);
+            }
+        }
+
+        async function refreshLeaderboardData() {
+            const tbody = document.getElementById('teacherLeaderboardTable');
+            tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-mint-600">Loading live data...</td></tr>';
+
+            let data = [];
+            if (window.isFirebaseReady && window.db && window.auth?.currentUser) {
+                try {
+                    const colRef = collection(window.db, 'artifacts', window.appId, 'public', 'data', 'leaderboard');
+                    const snapshot = await getDocs(colRef);
+                    snapshot.forEach(doc => data.push(doc.data()));
+                    data.sort((a,b) => a.seconds - b.seconds);
+                } catch(e) {
+                    data = getLocalBoard();
+                }
+            } else {
+                data = getLocalBoard();
+            }
+
+            tbody.innerHTML = '';
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-mint-600">No student sessions recorded yet.</td></tr>';
+                return;
+            }
+
+            data.forEach((item, idx) => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-mint-50';
+                tr.innerHTML = `
+                    <td class="p-3 font-bold text-mint-900">${idx + 1}</td>
+                    <td class="p-3 font-extrabold text-mint-950">${item.studentName || item.team}</td>
+                    <td class="p-3 font-mono font-bold text-mint-700">${item.icNumber || 'N/A'}</td>
+                    <td class="p-3 font-mono font-bold text-mint-700">${item.timeStr}</td>
+                    <td class="p-3 font-mono text-mint-800">${item.hints || 0}</td>
+                    <td class="p-3 text-xs text-mint-600">${item.date || 'Today'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function exportCSV() {
+            const data = getLocalBoard();
+            if (data.length === 0) {
+                showModal("No Data", "There are no student results to export.", 'fa-file-excel', true);
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,Rank,Student Name,IC Number,Time,Hints Used,Date\n";
+            data.forEach((row, idx) => {
+                csvContent += `${idx + 1},"${row.studentName || row.team}","${row.icNumber || 'N/A'}",${row.timeStr},${row.hints || 0},${row.date || ''}\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "mind_gym_escape_room_results.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        let clearConfirmPending = false;
+
+        function requestClearLocalBoard() {
+            const btn = document.getElementById('clearDataBtn');
+            if (!clearConfirmPending) {
+                clearConfirmPending = true;
+                btn.innerText = 'Tap again to Confirm Delete!';
+                btn.className = 'px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs transition animate-pulse';
+                setTimeout(() => {
+                    clearConfirmPending = false;
+                    if (btn) {
+                        btn.innerText = 'Clear Local Data';
+                        btn.className = 'px-4 py-2 bg-red-100 hover:bg-red-200 text-red-800 font-bold rounded-xl text-xs transition';
+                    }
+                }, 4000);
+            } else {
+                clearConfirmPending = false;
+                localStorage.removeItem('mindGymLeaderboard');
+                btn.innerText = 'Clear Local Data';
+                btn.className = 'px-4 py-2 bg-red-100 hover:bg-red-200 text-red-800 font-bold rounded-xl text-xs transition';
+                refreshLeaderboardData();
+                renderPublicLeaderboard();
+                showModal("Data Cleared", "Local student leaderboard records have been cleared successfully.", 'fa-trash-can');
+            }
+        }
+
+        // On window load initialization
+        window.onload = function() {
+            renderPublicLeaderboard();
+        };
+    </script>
+</body>
+</html>
