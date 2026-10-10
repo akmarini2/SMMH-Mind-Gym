@@ -35,6 +35,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <!-- Firebase SDK Compat Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
     <style>
         body {
@@ -70,7 +74,6 @@
             40%, 80% { transform: translateX(8px); }
         }
 
-        /* Custom scrollbar for leaderboard & logs */
         ::-webkit-scrollbar {
             width: 8px;
         }
@@ -103,6 +106,11 @@
             </div>
 
             <div class="flex items-center space-x-3">
+                <!-- Cloud Status Indicator -->
+                <div id="cloudStatusBadge" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300" title="Cloud Sync Active">
+                    <i class="fas fa-cloud text-emerald-600"></i>
+                    <span>Cloud Synced</span>
+                </div>
                 <button id="soundToggleBtn" onclick="toggleAudio()" class="p-2.5 rounded-xl bg-mint-100 hover:bg-mint-200 text-mint-800 transition flex items-center gap-2 text-sm font-semibold" title="Toggle Sound">
                     <i class="fas fa-volume-up" id="soundIcon"></i>
                     <span class="hidden sm:inline" id="soundText">Sound ON</span>
@@ -164,7 +172,7 @@
                         <input type="text" id="classYearInput" maxlength="20" placeholder="e.g. Year 9 / Form 3" class="w-full px-4 py-3 rounded-xl bg-mint-50/50 border-2 border-mint-200 focus:border-mint-500 focus:bg-white focus:outline-none text-mint-900 font-semibold transition placeholder:text-mint-400">
                     </div>
                     <p class="text-xs text-mint-600 flex items-center gap-1 pt-1">
-                        <i class="fas fa-rotate text-mint-500"></i> Shared Device Mode: Sequential replays enabled.
+                        <i class="fas fa-rotate text-mint-500"></i> Multi-device cloud sync enabled.
                     </p>
                 </div>
 
@@ -389,7 +397,7 @@
                         <h3 class="text-xl font-extrabold text-mint-950 flex items-center gap-2">
                             <i class="fas fa-list-ol text-mint-600"></i> Hall of Fame Leaderboard
                         </h3>
-                        <span class="text-xs font-semibold text-mint-600 bg-mint-100 px-3 py-1 rounded-full">Top Performers</span>
+                        <span class="text-xs font-semibold text-mint-600 bg-mint-100 px-3 py-1 rounded-full">Live Master List</span>
                     </div>
 
                     <div class="bg-white rounded-2xl border border-mint-200 overflow-hidden shadow-inner max-h-60 overflow-y-auto">
@@ -439,7 +447,7 @@
                 </div>
                 <h3 class="text-2xl font-black text-mint-950 mb-2">Teacher & Facilitator Access</h3>
                 <p class="text-mint-800 text-sm mb-6 max-w-md mx-auto">
-                    Enter the passcode to view class results, analytics, and manage the student leaderboard.
+                    Enter the passcode to view class results, analytics, and configure cloud database sync.
                 </p>
 
                 <div class="max-w-xs mx-auto mb-4">
@@ -457,11 +465,29 @@
                         <h3 class="text-xl font-black text-mint-950 flex items-center gap-2">
                             <i class="fas fa-chalkboard-user text-mint-600"></i> Class Results Dashboard
                         </h3>
-                        <span class="text-xs font-semibold text-mint-600">Live Student Escape Times</span>
+                        <span class="text-xs font-semibold text-mint-600" id="dashSyncStatus">Live Student Escape Times</span>
                     </div>
                     <button onclick="refreshLeaderboardData()" class="px-3 py-1.5 rounded-lg bg-mint-100 hover:bg-mint-200 text-mint-800 font-bold text-xs transition flex items-center gap-1">
                         <i class="fas fa-sync-alt"></i> Refresh
                     </button>
+                </div>
+
+                <!-- Firebase Config Accordion / Form -->
+                <div class="bg-mint-50 p-4 rounded-xl border border-mint-200 mb-4 text-left">
+                    <div class="flex justify-between items-center cursor-pointer" onclick="toggleFirebaseConfigBox()">
+                        <span class="text-xs font-extrabold uppercase text-mint-900 flex items-center gap-1.5">
+                            <i class="fas fa-database text-mint-600"></i> Cloud Firebase Configuration
+                        </span>
+                        <i class="fas fa-chevron-down text-mint-600 text-xs" id="firebaseConfigChevron"></i>
+                    </div>
+                    <div id="firebaseConfigContent" class="hidden mt-3 space-y-3 pt-3 border-t border-mint-200">
+                        <p class="text-xs text-mint-700">Paste your free Firebase Realtime Database JSON URL below to sync all student phones in real time:</p>
+                        <input type="text" id="firebaseDbUrlInput" placeholder="https://your-app-default-rtdb.asia-southeast1.firebasedatabase.app" class="w-full px-3 py-2 text-xs rounded-lg bg-white border border-mint-300 font-mono text-mint-900">
+                        <div class="flex gap-2">
+                            <button onclick="saveFirebaseConfig()" class="px-3 py-1.5 bg-mint-600 hover:bg-mint-700 text-white font-bold rounded-lg text-xs transition">Connect Cloud DB</button>
+                            <button onclick="disconnectFirebaseConfig()" class="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-800 font-bold rounded-lg text-xs transition">Disconnect Cloud</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="bg-white rounded-xl border border-mint-200 overflow-hidden flex-grow overflow-y-auto mb-4">
@@ -485,7 +511,7 @@
                         <i class="fas fa-file-csv"></i> Export Results (CSV)
                     </button>
                     <button id="clearDataBtn" onclick="requestClearLocalBoard()" class="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-800 font-bold rounded-xl text-xs transition">
-                        Clear Local Data
+                        Clear Records
                     </button>
                 </div>
             </div>
@@ -494,8 +520,44 @@
     </div>
 
     <script>
-        // In-memory array fallback to handle restricted iframe environments
+        // In-memory array & Firebase setup
         let memoryLeaderboard = [];
+        let firebaseDB = null;
+        let isCloudActive = false;
+
+        function initFirebaseFromStorage() {
+            try {
+                const savedUrl = localStorage.getItem('mindGymFirebaseUrl');
+                if (savedUrl && typeof firebase !== 'undefined') {
+                    if (!firebase.apps.length) {
+                        firebase.initializeApp({
+                            databaseURL: savedUrl
+                        });
+                    }
+                    firebaseDB = firebase.database();
+                    isCloudActive = true;
+                    const badge = document.getElementById('cloudStatusBadge');
+                    if (badge) {
+                        badge.classList.remove('hidden');
+                        badge.className = 'hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300';
+                    }
+                    
+                    // Listen for live updates
+                    firebaseDB.ref('leaderboard').on('value', (snapshot) => {
+                        const val = snapshot.val();
+                        if (val) {
+                            let list = Object.values(val);
+                            list.sort((a,b) => a.seconds - b.seconds);
+                            memoryLeaderboard = list;
+                            renderPublicLeaderboard();
+                            refreshLeaderboardData();
+                        }
+                    });
+                }
+            } catch(e) {
+                isCloudActive = false;
+            }
+        }
 
         let gameState = {
             studentName: '',
@@ -511,7 +573,6 @@
             soundEnabled: true
         };
 
-        // Web Audio Synthesizer for embedded sound FX
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
         function playSound(type) {
@@ -988,6 +1049,7 @@
             } catch(e) {}
 
             const entry = {
+                id: 'id_' + Date.now() + Math.random().toString(36).substring(2, 7),
                 team: gameState.studentName,
                 studentName: gameState.studentName,
                 classYear: gameState.classYear,
@@ -1001,49 +1063,39 @@
         }
 
         function getLocalBoard() {
-            let data = [];
-            
-            // 1. Try localStorage
-            try {
-                const ls = localStorage.getItem('mindGymLeaderboard');
-                if (ls) data = JSON.parse(ls);
-            } catch(e) {}
-
-            // 2. Try sessionStorage fallback
+            let data = [...memoryLeaderboard];
             if (data.length === 0) {
                 try {
-                    const ss = sessionStorage.getItem('mindGymLeaderboard');
-                    if (ss) data = JSON.parse(ss);
+                    const ls = localStorage.getItem('mindGymLeaderboard');
+                    if (ls) data = JSON.parse(ls);
                 } catch(e) {}
             }
-
-            // 3. Fallback to in-memory array if browser storage is blocked
-            if (data.length === 0 && memoryLeaderboard.length > 0) {
-                data = memoryLeaderboard;
-            }
-
             return data;
         }
 
         function saveLeaderboardEntry(entry) {
+            if (isCloudActive && firebaseDB) {
+                try {
+                    const newRef = firebaseDB.ref('leaderboard').push();
+                    newRef.set(entry);
+                } catch(e) {
+                    fallbackSaveLocal(entry);
+                }
+            } else {
+                fallbackSaveLocal(entry);
+            }
+        }
+
+        function fallbackSaveLocal(entry) {
             let current = getLocalBoard();
             current.push(entry);
             current.sort((a,b) => a.seconds - b.seconds);
-
-            // Save in memory
             memoryLeaderboard = current;
-
-            // Save in localStorage
             try {
                 localStorage.setItem('mindGymLeaderboard', JSON.stringify(current));
             } catch(e) {}
-
-            // Save in sessionStorage
-            try {
-                sessionStorage.setItem('mindGymLeaderboard', JSON.stringify(current));
-            } catch(e) {}
-
             renderPublicLeaderboard();
+            refreshLeaderboardData();
         }
 
         function renderPublicLeaderboard() {
@@ -1052,6 +1104,7 @@
             tbody.innerHTML = '';
 
             const data = getLocalBoard();
+            data.sort((a,b) => a.seconds - b.seconds);
 
             if (data.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-mint-600 italic">No escape times logged yet. Be the first!</td></tr>';
@@ -1086,10 +1139,49 @@
                 document.getElementById('teacherLoginSection').classList.add('hidden');
                 document.getElementById('teacherDashboardSection').classList.remove('hidden');
                 document.getElementById('teacherDashboardSection').classList.add('flex');
+                
+                const urlInput = document.getElementById('firebaseDbUrlInput');
+                if (urlInput && localStorage.getItem('mindGymFirebaseUrl')) {
+                    urlInput.value = localStorage.getItem('mindGymFirebaseUrl');
+                }
                 refreshLeaderboardData();
             } else {
                 showModal("Access Denied", "Incorrect teacher passcode!", 'fa-lock', true);
             }
+        }
+
+        function toggleFirebaseConfigBox() {
+            const content = document.getElementById('firebaseConfigContent');
+            const chev = document.getElementById('firebaseConfigChevron');
+            if (content.classList.contains('hidden')) {
+                content.classList.remove('hidden');
+                chev.className = 'fas fa-chevron-up text-mint-600 text-xs';
+            } else {
+                content.classList.add('hidden');
+                chev.className = 'fas fa-chevron-down text-mint-600 text-xs';
+            }
+        }
+
+        function saveFirebaseConfig() {
+            const url = document.getElementById('firebaseDbUrlInput').value.trim();
+            if (!url) {
+                showModal("URL Required", "Please enter a valid Firebase Realtime Database URL.", 'fa-database', true);
+                return;
+            }
+            localStorage.setItem('mindGymFirebaseUrl', url);
+            showModal("Cloud Connected", "Firebase Database URL saved successfully! Page will reload to sync.", 'fa-cloud');
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        }
+
+        function disconnectFirebaseConfig() {
+            localStorage.removeItem('mindGymFirebaseUrl');
+            isCloudActive = false;
+            showModal("Cloud Disconnected", "Switched back to local device storage.", 'fa-hard-drive');
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
         }
 
         function refreshLeaderboardData() {
@@ -1097,7 +1189,13 @@
             if (!tbody) return;
             
             const data = getLocalBoard();
+            data.sort((a,b) => a.seconds - b.seconds);
             tbody.innerHTML = '';
+
+            const statusLabel = document.getElementById('dashSyncStatus');
+            if (statusLabel) {
+                statusLabel.innerText = isCloudActive ? 'Live Cloud Synced (Multi-Device)' : 'Local Storage Mode';
+            }
 
             if (data.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-mint-600">No student sessions recorded yet.</td></tr>';
@@ -1146,12 +1244,12 @@
             const btn = document.getElementById('clearDataBtn');
             if (!clearConfirmPending) {
                 clearConfirmPending = true;
-                btn.innerText = 'Tap again to Confirm Delete!';
+                btn.innerText = 'Tap again to Confirm!';
                 btn.className = 'px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs transition animate-pulse';
                 setTimeout(() => {
                     clearConfirmPending = false;
                     if (btn) {
-                        btn.innerText = 'Clear Local Data';
+                        btn.innerText = 'Clear Records';
                         btn.className = 'px-4 py-2 bg-red-100 hover:bg-red-200 text-red-800 font-bold rounded-xl text-xs transition';
                     }
                 }, 4000);
@@ -1159,17 +1257,20 @@
                 clearConfirmPending = false;
                 memoryLeaderboard = [];
                 try { localStorage.removeItem('mindGymLeaderboard'); } catch(e) {}
-                try { sessionStorage.removeItem('mindGymLeaderboard'); } catch(e) {}
+                if (isCloudActive && firebaseDB) {
+                    firebaseDB.ref('leaderboard').remove();
+                }
                 
-                btn.innerText = 'Clear Local Data';
+                btn.innerText = 'Clear Records';
                 btn.className = 'px-4 py-2 bg-red-100 hover:bg-red-200 text-red-800 font-bold rounded-xl text-xs transition';
                 refreshLeaderboardData();
                 renderPublicLeaderboard();
-                showModal("Data Cleared", "Local student leaderboard records have been cleared successfully.", 'fa-trash-can');
+                showModal("Records Cleared", "Leaderboard data has been successfully cleared.", 'fa-trash-can');
             }
         }
 
         window.onload = function() {
+            initFirebaseFromStorage();
             renderPublicLeaderboard();
         };
     </script>
