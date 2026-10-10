@@ -525,6 +525,9 @@
         let firebaseDB = null;
         let isCloudActive = false;
 
+        // PASTE YOUR FIREBASE REALTIME DATABASE URL HERE SO ALL STUDENT DEVICES SYNC AUTOMATICALLY
+        const DEFAULT_FIREBASE_URL = "https://smmht-mind-gym-default-rtdb.asia-southeast1.firebasedatabase.app/";
+
         function updateCloudBadge(status, text) {
             const badge = document.getElementById('cloudStatusBadge');
             const icon = document.getElementById('cloudStatusIcon');
@@ -550,8 +553,10 @@
 
         function initFirebaseFromStorage() {
             try {
-                const savedUrl = localStorage.getItem('mindGymFirebaseUrl');
-                if (savedUrl && typeof firebase !== 'undefined') {
+                // Check saved URL or fall back to default hardcoded URL
+                const savedUrl = localStorage.getItem('mindGymFirebaseUrl') || DEFAULT_FIREBASE_URL;
+                
+                if (savedUrl && savedUrl !== "https://your-project-id-default-rtdb.asia-southeast1.firebasedatabase.app" && typeof firebase !== 'undefined') {
                     // Normalize database URL string
                     let cleanUrl = savedUrl.trim();
                     if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
