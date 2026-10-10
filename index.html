@@ -107,9 +107,9 @@
 
             <div class="flex items-center space-x-3">
                 <!-- Cloud Status Indicator -->
-                <div id="cloudStatusBadge" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300" title="Cloud Sync Active">
-                    <i class="fas fa-cloud text-emerald-600"></i>
-                    <span>Cloud Synced</span>
+                <div id="cloudStatusBadge" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-100 text-amber-800 text-xs font-bold border border-amber-300" title="Cloud Sync Status">
+                    <i class="fas fa-cloud text-amber-600" id="cloudStatusIcon"></i>
+                    <span id="cloudStatusText">Connecting Cloud...</span>
                 </div>
                 <button id="soundToggleBtn" onclick="toggleAudio()" class="p-2.5 rounded-xl bg-mint-100 hover:bg-mint-200 text-mint-800 transition flex items-center gap-2 text-sm font-semibold" title="Toggle Sound">
                     <i class="fas fa-volume-up" id="soundIcon"></i>
@@ -525,37 +525,71 @@
         let firebaseDB = null;
         let isCloudActive = false;
 
+        function updateCloudBadge(status, text) {
+            const badge = document.getElementById('cloudStatusBadge');
+            const icon = document.getElementById('cloudStatusIcon');
+            const label = document.getElementById('cloudStatusText');
+            
+            if (!badge) return;
+            badge.classList.remove('hidden');
+
+            if (status === 'connected') {
+                badge.className = 'hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300';
+                if (icon) icon.className = 'fas fa-cloud text-emerald-600';
+                if (label) label.innerText = text || 'Cloud Synced';
+            } else if (status === 'error') {
+                badge.className = 'hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-100 text-red-800 text-xs font-bold border border-red-300';
+                if (icon) icon.className = 'fas fa-triangle-exclamation text-red-600';
+                if (label) label.innerText = text || 'Cloud Offline';
+            } else {
+                badge.className = 'hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-100 text-amber-800 text-xs font-bold border border-amber-300';
+                if (icon) icon.className = 'fas fa-spinner fa-spin text-amber-600';
+                if (label) label.innerText = text || 'Connecting...';
+            }
+        }
+
         function initFirebaseFromStorage() {
             try {
                 const savedUrl = localStorage.getItem('mindGymFirebaseUrl');
                 if (savedUrl && typeof firebase !== 'undefined') {
+                    // Normalize database URL string
+                    let cleanUrl = savedUrl.trim();
+                    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+                        cleanUrl = 'https://' + cleanUrl;
+                    }
+
                     if (!firebase.apps.length) {
                         firebase.initializeApp({
-                            databaseURL: savedUrl
+                            databaseURL: cleanUrl
                         });
                     }
                     firebaseDB = firebase.database();
                     isCloudActive = true;
-                    const badge = document.getElementById('cloudStatusBadge');
-                    if (badge) {
-                        badge.classList.remove('hidden');
-                        badge.className = 'hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300';
-                    }
-                    
-                    // Listen for live updates
+                    updateCloudBadge('connected', 'Cloud Synced');
+
+                    // Listen for live updates across all devices
                     firebaseDB.ref('leaderboard').on('value', (snapshot) => {
                         const val = snapshot.val();
                         if (val) {
                             let list = Object.values(val);
                             list.sort((a,b) => a.seconds - b.seconds);
                             memoryLeaderboard = list;
-                            renderPublicLeaderboard();
-                            refreshLeaderboardData();
+                        } else {
+                            memoryLeaderboard = [];
                         }
+                        renderPublicLeaderboard();
+                        refreshLeaderboardData();
+                    }, (error) => {
+                        console.error("Firebase read error:", error);
+                        updateCloudBadge('error', 'Sync Blocked (Check Rules)');
                     });
+                } else {
+                    updateCloudBadge('error', 'Local Storage Mode');
                 }
             } catch(e) {
+                console.error("Firebase initialization failed:", e);
                 isCloudActive = false;
+                updateCloudBadge('error', 'Sync Error');
             }
         }
 
@@ -1077,8 +1111,18 @@
             if (isCloudActive && firebaseDB) {
                 try {
                     const newRef = firebaseDB.ref('leaderboard').push();
-                    newRef.set(entry);
+                    newRef.set(entry, (error) => {
+                        if (error) {
+                            console.error("Firebase Push Error:", error);
+                            showModal("Cloud Storage Error", "Could not sync score to cloud database. Please verify Firebase rules allow write access. Saved locally.", "fa-triangle-exclamation", true);
+                            fallbackSaveLocal(entry);
+                        } else {
+                            // Local cache update
+                            fallbackSaveLocal(entry, false);
+                        }
+                    });
                 } catch(e) {
+                    console.error("Firebase Execution Error:", e);
                     fallbackSaveLocal(entry);
                 }
             } else {
@@ -1086,11 +1130,13 @@
             }
         }
 
-        function fallbackSaveLocal(entry) {
+        function fallbackSaveLocal(entry, pushToList = true) {
             let current = getLocalBoard();
-            current.push(entry);
-            current.sort((a,b) => a.seconds - b.seconds);
-            memoryLeaderboard = current;
+            if (pushToList) {
+                current.push(entry);
+                current.sort((a,b) => a.seconds - b.seconds);
+                memoryLeaderboard = current;
+            }
             try {
                 localStorage.setItem('mindGymLeaderboard', JSON.stringify(current));
             } catch(e) {}
